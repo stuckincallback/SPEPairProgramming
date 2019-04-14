@@ -1,0 +1,194 @@
+<%- include('layout'); -%>
+<body>
+    <div class = "col-sm-6 col-md-4 col-md-offset-4">
+                <% if (user) { %>  
+                    <h1 class = "text-center login-title" >Welcome <%= user.username%>. Check your details below:</h1>
+                <% } %> 
+                <a href="/signout">SignOut</a>                        
+    </div>
+    <div class = "col-md-4"></div>
+    <div id = "wrapper">
+        <div id="editor">
+        </div>
+        <div id="question" class = "scroll">
+        </div>
+        <div id="editor2">function foo(items) {
+                var x = "All this is syntax highlighted";
+                return x;
+        }</div>
+    </div> 
+    <div id="buttons">
+        <input id = "compile" type="button" name="Compile" value="compile" />
+        <input type="button" name="Submit" value="submit" onclick="getText()"/>
+        <input type="hidden" id="myField" name="text" value="{{this.text}}" />
+    
+        </div>   
+        <div id="result">
+            <div class = "whitespace" id="status"></div>
+            <div>Sample Output</div> 
+            <div class = "whitespace" id="sampleoutput"></div>
+            <div>Your Output</div>
+            <div class = "whitespace" id="youroutput"></div>
+        </div>
+        <div class="modal"><!-- Place at bottom of page --></div>
+
+<<!-- The Modal -->
+<div id="myModal" class="modalpopup">
+
+        <!-- Modal content -->
+        <div class="modalpopup-content">
+                <div class="modalpopup-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                        <h4 class="modalpopup-title" id="myModalLabel">Challenge Request</h4>
+                </div>
+                <div class="modalpopup-body" id="popudbody">
+                        ...
+                </div>
+                <div class="modalpopup-footer">
+                        <button id = "accepted" type="button" class="btn btn-default" data-dismiss="modal" onclick="challengeAccepted()">Accept</button>
+                        <button id = "rejected" type="button" class="btn btn-primary" onclick="challengeRejected()">Reject</button>
+                </div>
+        </div>
+      
+</div>
+      
+    <script>
+        //filter: blur(10px);
+        $(document).ready(function(){
+            //$(".loader").hide()
+            var data = {
+                name: "",
+                text:"",
+                socketid:""
+            }
+            var userName = "<%= user.username%>";
+            console.log(userName);
+            $('#compile').bind("click",getText);
+            var socket = io.connect();
+            console.log(socket.id);
+            
+            var text = "";
+            var editor;
+            var myId;
+            socket.on('connect', function(){
+                myId = socket.id;
+                socket.emit('userConnected', {userName:userName, socketid:socket.id});
+                editor = ace.edit("editor");
+                editor.setTheme("ace/theme/monokai");
+                editor.session.setMode("ace/mode/javascript");
+
+                var editor2 = ace.edit("editor2");
+                editor2.setTheme("ace/theme/monokai");
+                editor2.session.setMode("ace/mode/javascript");
+                var text = '';
+                editor.session.on('change', function(delta) {
+                    text = editor.getValue();
+                    data.name = name;
+                    data.text = text;
+                    data.socketid = socket.id;
+                    //console.log(data);
+                    socket.emit('chat message', data);  
+                });
+
+                socket.on('chat message', function(response)  {
+                    if(response.name != name)  {
+                        editor2.setValue(response.text);
+                    }
+                });
+                    
+                socket.on('newUserConnected', function(response)  {
+                    console.log(response);
+                    $( "#question" ).empty();
+                    response.userArray.forEach(element => {
+                        //if(element.userName != userName){
+                           // $('#question').append($("#batchInsert").html());
+                            //$('#user-name').text(element.userName)
+                            var $newdiv1 = $('<div class="chat-users">'+
+                                                    '<div class="users-list">'+
+                                                        '<div class="chat-user">'+
+                                                        '<img class="chat-avatar" src="https://bootdey.com/img/Content/avatar/avatar1.png" alt="">'+
+                                                        '<div class="chat-user-name">'+
+                                                            '<span>'+element.userName+'</span>'+
+                                                            '<Button class = "btn btn-primary btn-sm pull-right" onclick="connectToUser(this)" data-myid="'+element.socketid+'">Connect</Button>'+
+                                                        '</div>'+
+                                                    '</div>'+
+                                                '<div>' );
+                        $('#question').append($newdiv1);
+                        //}
+                    });
+                });
+
+                socket.on('challengeReceived', function(response)  {
+                    console.log(response);
+                    $('#popudbody').text('Hi '+response.name+' wants to do programming with you')
+                    $("#myModal").css("display", "block");
+                });
+
+                socket.on('challengeAccepted', function(response)  {
+                
+                });
+            });//End of Socket Connection
+       });//End of jquery
+       function challengeRejected(){
+                    $("#myModal").css("display", "none");
+        } 
+        function challengeAccepted(){
+                        socket.emit('challengeAccepted','challengeAccepted');
+        }
+       function getText(){
+            let text = editor.getValue();
+            postData = {
+                code: text
+            }
+            $.ajax({
+                type: "POST",
+                url: "/",
+                data: postData,
+                success: getData,
+                dataType: 'json'
+            });
+            //document.getElementById('myField').value = text;
+            //console.log(document.getElementById('myField').value);
+        }
+        function getData(data)  {
+            console.log(data)
+            $('#status').text(data.data.status.description);
+            $('#sampleoutput').text(data.data.stdin);
+            $('#youroutput').text(data.data.stdout);
+        }
+        function connectToUser(obj){
+            var friendsId = obj.getAttribute('data-myid');
+            var privateConnection ={
+                name:"<%= user.username%>",
+                friendid:friendsId
+            }
+            $.ajax({
+                type: "POST",
+                url: "/connectToUser",
+                data: privateConnection,
+                success: responseFromFriend,
+                beforeSend: showSpinner,
+                complete: hideSpinner, 
+                dataType: 'json'
+            });
+        }
+        function showSpinner(){
+            $body = $("body");
+            $body.addClass("loading");
+            //$( "#question" ).empty();
+            //$('#question').append('<div class="loader"></div>');
+            //$(".loader").show();
+        }
+        function hideSpinner(){
+           // $(".loader").hide();
+           setTimeout(()=>{$body.removeClass("loading");},2000)
+        }
+        function responseFromFriend(data){
+
+        }
+    </script>
+    
+          
+      
+</body>
+</html>
