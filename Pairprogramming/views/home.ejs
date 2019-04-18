@@ -1,5 +1,11 @@
 <%- include('layout'); -%>
 <body>
+        <div class="row"> 
+             <div id="clockdiv" class="col-md-2 pull-right">
+                    Minutes: <span class="minutes">Loading...</span><br>
+                    Seconds: <span class="seconds"></span>
+            </div>
+        </div>
     <div class = "col-sm-6 col-md-4 col-md-offset-4">
                 <% if (user) { %>  
                     <h1 class = "text-center login-title" >Welcome <%= user.username%>. Check your details below:</h1>
@@ -18,17 +24,21 @@
         }</div>
     </div> 
     <div id="buttons">
-        <input id = "compile" type="button" name="Compile" value="compile" />
-        <input type="button" name="Submit" value="submit" onclick="getText()"/>
+        <input id = "compile" type="button" name="Compile" value="compile" onclick="compile()"/>
+        <input type="button" name="Submit" value="submit"  onclick="submit()"/>
         <input type="hidden" id="myField" name="text" value="{{this.text}}" />
     
         </div>   
         <div id="result">
             <div class = "whitespace" id="status"></div>
-            <div>Sample Output</div> 
+            <div>Sample Input</div> 
+            <div class = "whitespace" id="sampleinput"></div>
+            <div>Sample Output</div>
             <div class = "whitespace" id="sampleoutput"></div>
             <div>Your Output</div>
             <div class = "whitespace" id="youroutput"></div>
+            <div>Your Output</div>
+            <div class = "whitespace" id="opponentsResult"></div>
         </div>
         <div class="modal"><!-- Place at bottom of page --></div>
 
@@ -53,9 +63,15 @@
 </div>
       
     <script>
+        var socket;
+        var editor;
+        var editor2;
+        var url ;
         //filter: blur(10px);
         $(document).ready(function(){
             //$(".loader").hide()
+            $("#clockdiv").hide();
+            $("#opponentsResult").hide();
             var data = {
                 name: "",
                 text:"",
@@ -63,12 +79,12 @@
             }
             var userName = "<%= user.username%>";
             console.log(userName);
-            $('#compile').bind("click",getText);
-            var socket = io.connect();
+            $('#compile').bind("click",compile);
+            socket = io.connect();
             console.log(socket.id);
             
             var text = "";
-            var editor;
+            
             var myId;
             socket.on('connect', function(){
                 myId = socket.id;
@@ -77,23 +93,26 @@
                 editor.setTheme("ace/theme/monokai");
                 editor.session.setMode("ace/mode/javascript");
 
-                var editor2 = ace.edit("editor2");
+                editor2 = ace.edit("editor2");
                 editor2.setTheme("ace/theme/monokai");
                 editor2.session.setMode("ace/mode/javascript");
-                var text = '';
-                editor.session.on('change', function(delta) {
-                    text = editor.getValue();
-                    data.name = name;
-                    data.text = text;
-                    data.socketid = socket.id;
-                    //console.log(data);
-                    socket.emit('chat message', data);  
-                });
-
-                socket.on('chat message', function(response)  {
-                    if(response.name != name)  {
+                var text = '';             
+                    editor.session.on('change', function(delta) {
+                        console.log($("#clockdiv").attr("data-inMatch"));
+                        text = editor.getValue();
+                        data.name = name;
+                        data.text = text;
+                        data.socketid = socket.id;
+                        //console.log(data);
+                        if($("#clockdiv").attr("data-inMatch") == 'true'){
+                            socket.emit('codeInEditor', data);  
+                        }
+                     });
+                
+                socket.on('codeInOpponentsEditor', function(response)  {
+                    //if(response.name != name)  {
                         editor2.setValue(response.text);
-                    }
+                    //}
                 });
                     
                 socket.on('newUserConnected', function(response)  {
@@ -127,40 +146,127 @@
                 socket.on('challengeAccepted', function(response)  {
                 
                 });
+
+                socket.on('hideSpinner', function(response)  {
+                    hideSpinner();
+                });
+
+                socket.on('loadChallenge', function(response){
+                    $('#clockdiv').show();
+                    $('#clockdiv').attr('data-inMatch', 'true');
+                    var filterVal = 'blur(10px)';
+                    $('#editor2')
+                    .css('filter',filterVal)
+                    .css('webkitFilter',filterVal)
+                    .css('mozFilter',filterVal)
+                    .css('oFilter',filterVal)
+                    .css('msFilter',filterVal);
+
+                    url = response.questionUrl;
+                    console.log(url);
+                    postData = {
+                        url: url
+                    }
+                    $.ajax({
+                        type: "POST",
+                        url: "/problem",
+                        data: postData,
+                        success: loadChallenge,
+                        dataType: 'json'
+                    });
+
+                })
+                socket.on('timesUp', function(response)  {
+                    $("#opponentsResult").show();
+                    var filterValue = $('#editor2').css('filter');
+                    if(filterValue == 'blur(10px)'){
+                        var filterVal = 'blur(0px)';
+                        $('#editor2')
+                        .css('filter',filterVal)
+                        .css('webkitFilter',filterVal)
+                        .css('mozFilter',filterVal)
+                        .css('oFilter',filterVal)
+                        .css('msFilter',filterVal);
+                    }
+                });
+
+                socket.on('timer', function(response)  {
+                    console.log($('#clockdiv .minutes').html());
+                    $('#clockdiv .minutes').text(response.time.minutes);
+                    $('#clockdiv .seconds').text(response.time.seconds);
+                });
+                socket.on('opponentsResult', function(response){
+                    $("#opponentsResult").html(response);
+                    console.log(response);
+                });
             });//End of Socket Connection
        });//End of jquery
+
+       function loadChallenge(data){
+                        $("#myModal").css("display", "none");   
+                        $("body").removeClass("loading");
+                        $('#question').empty();
+                        $('#question').html(data.statement);
+                        $('#sampleinput').html(data.sampleInput);
+                        $('#sampleoutput').html(data.sampleOutput);
+       }
        function challengeRejected(){
                     $("#myModal").css("display", "none");
+                    socket.emit('challengeRejected',{opponentSocketID:socket.id});
         } 
         function challengeAccepted(){
-                        socket.emit('challengeAccepted','challengeAccepted');
+                        socket.emit('challengeAccepted',{opponentSocketID:socket.id});
         }
-       function getText(){
+       function compile(){
+            $('#status').text("Compiling...");
             let text = editor.getValue();
+            let sampleInput = $('#sampleinput').text();
+            let sampleOutput  = $('#sampleoutput').text();
             postData = {
-                code: text
+                code: text,
+                sampleInput: sampleInput,
+                sampleOutput: sampleOutput,
+                type:'compile'
             }
             $.ajax({
                 type: "POST",
                 url: "/",
                 data: postData,
-                success: getData,
+                success: getCompileData,
                 dataType: 'json'
             });
             //document.getElementById('myField').value = text;
             //console.log(document.getElementById('myField').value);
         }
-        function getData(data)  {
+        function getCompileData(data)  {
             console.log(data)
-            $('#status').text(data.data.status.description);
-            $('#sampleoutput').text(data.data.stdin);
-            $('#youroutput').text(data.data.stdout);
+            $('#status').text(data.compileData.status);
+            $('#youroutput').text(data.compileData.result);
+        }
+
+        function submit(){
+            $('#status').text("Submitting...");
+            let text = editor.getValue();
+            postData = {
+                code: text,
+                url: url,
+                type:'submit',
+                socketid: socket.id
+            }
+            $.ajax({
+                type: "POST",
+                url: "/",
+                data: postData,
+                success: getCompileData,
+                dataType: 'json'
+            });
         }
         function connectToUser(obj){
             var friendsId = obj.getAttribute('data-myid');
             var privateConnection ={
                 name:"<%= user.username%>",
-                friendid:friendsId
+                challengerSocketID:socket.id,
+                opponentSocketID:friendsId
             }
             $.ajax({
                 type: "POST",
@@ -182,7 +288,7 @@
         function hideSpinner(){
            // $(".loader").hide();
            setTimeout(()=>{$body.removeClass("loading");},2000)
-        }
+        }0
         function responseFromFriend(data){
 
         }

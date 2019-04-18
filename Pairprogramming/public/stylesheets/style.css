@@ -105,6 +105,9 @@ ul.user-details{
       white-space: pre-wrap;
   }
 
+  #question{
+      padding: 20px;
+  }
   /* Start by setting display:none to make this hidden.
    Then we position it in relation to the viewport window
    with position:fixed. Width, height, top and left speak
@@ -174,3 +177,30 @@ body.loading .modal {
     text-decoration: none;
     cursor: pointer;
   }
+
+  #clockdiv{
+    font-family: sans-serif;
+    color: rgb(26, 23, 23);
+    display: inline-block;
+    font-weight: 100;
+    text-align: center;
+    font-size: 30px;
+}
+#clockdiv > div{
+    padding: 10px;
+    border-radius: 3px;
+    background: #00BF96;
+    display: inline-block;
+}
+
+#clockdiv div > span{
+    padding: 15px;
+    border-radius: 3px;
+    background: #00816A;
+    display: inline-block;
+}
+
+.smalltext{
+    padding-top: 5px;
+    font-size: 16px;
+}

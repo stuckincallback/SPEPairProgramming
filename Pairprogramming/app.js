@@ -42,7 +42,6 @@ app.use(flash());
 // Initialize Passport
 var initPassport = require('./passport/init');
 initPassport(passport);
-
 var routes = require('./routes/index')(passport, io);
 app.use('/', routes);
 
