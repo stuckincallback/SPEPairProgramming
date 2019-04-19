@@ -10,7 +10,8 @@ var mongoose = require('mongoose');
 
 // Connect to DB
 mongoose.connect(dbConfig.url,{ useNewUrlParser: true },function(error){
-    console.log('error in app'+error)
+    if(error)
+        console.log(error);
 });
 
 var app = express();
@@ -24,7 +25,7 @@ app.set('view engine', 'ejs');
 app.use(favicon());
 app.use(logger('dev'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -32,7 +33,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 var passport = require('passport');
 var expressSession = require('express-session');
 // TODO - Why Do we need this key ?
-app.use(expressSession({secret: 'mySecretKey'}));
+app.use(expressSession({secret: 'mySecretKey', resave: true, saveUninitialized: true}));
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -65,6 +66,8 @@ if (app.get('env') === 'development') {
         });
     });
 }
+
+module.exports = app;
 
 
 
