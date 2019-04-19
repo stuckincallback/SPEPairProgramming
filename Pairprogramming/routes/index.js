@@ -179,6 +179,9 @@ module.exports = function(passport, io){
 		
 	  })
 	  
+	  router.get('*', function(req, res){
+		res.send('what???', 404);
+	  });
 	
 	io.on('connection', function(socket){
 		if(sockets.has(socket.id)){
@@ -206,7 +209,8 @@ module.exports = function(passport, io){
 			if(onlineUser.size != 0){
 				let userArray = []
 				onlineUser.forEach( user=>{userArray.push(user)});
-				io.sockets.emit('newUserConnected', {userArray});
+				//io.sockets.emit('newUserConnected', {userArray});
+				io.sockets.emit('refreshUsersView', {userArray});
 			}
 		});
 		socket.on('disconnect', function(){
@@ -215,7 +219,8 @@ module.exports = function(passport, io){
 			sockets.delete(socket.id);
 			let userArray = []
 			onlineUser.forEach( user=>{userArray.push(user)});
-			io.sockets.emit('newUserConnected', {userArray});
+			//io.sockets.emit('newUserConnected', {userArray});
+			io.sockets.emit('refreshUsersView', {userArray});
 		});
 	
 		socket.on('challengeAccepted', function(msg){
@@ -224,8 +229,8 @@ module.exports = function(passport, io){
 				challengerSocketID = usersInMatch.get(opponentSocketID).challengerSocketID;
 				//io.to(challengerSocketID).emit('joinroom',{roomId:opponent})
 				//console.log(sockets[challengerSocketID]);
-				sockets.get(challengerSocketID).join(opponentSocketID);// Included first
-				sockets.get(opponentSocketID).join(challengerSocketID);// Included next day
+				sockets.get(challengerSocketID).join(opponentSocketID);// Join Friends Room
+				sockets.get(opponentSocketID).join(challengerSocketID);// Friend Joins my Room
 				
 				challengerRecord = onlineUser.get(challengerSocketID)
 				challengerRecord.status = 'InaMatch';
@@ -235,8 +240,8 @@ module.exports = function(passport, io){
 				opponentRecord.status = 'InaMatch';
 				onlineUser.set(opponentSocketID, opponentRecord)
 
-				io.in(opponentSocketID).emit('challengeAccepted', 'set data-inMatch Atrribute');
-				io.in(challengerSocketID).emit('challengeAccepted', 'set data-inMatch Atrribute');
+				io.in(opponentSocketID).emit('challengeAccepted', 'set data-inMatch Atrribute');// Sending to all people in room including sender
+				//io.in(challengerSocketID).emit('challengeAccepted', 'set data-inMatch Atrribute');
 				
 
 				if(onlineUser.size != 0){
@@ -247,7 +252,7 @@ module.exports = function(passport, io){
 
 				io.in(opponentSocketID).emit('loadChallenge', {questionUrl:"https://www.hackerearth.com/practice/algorithms/sorting/insertion-sort/practice-problems/algorithm/the-rise-of-the-weird-things-1/"});
 				var starttime = new Date();
-				endtime = addMinutes(starttime, 1);
+				endtime = addMinutes(starttime, 1); // set to 1 minute
 				
 				var timeinterval = setInterval(function(){
 					var time = getTimeRemaining(endtime);
@@ -262,7 +267,6 @@ module.exports = function(passport, io){
 				}, 1500);*/
 				
 			}
-			console.log(msg);
 		});
 
 		socket.on('challengeRejected', function(msg){
@@ -271,15 +275,21 @@ module.exports = function(passport, io){
 				challengerSocketID = usersInMatch.get(opponent).challengerSocketID;
 				io.to(challengerSocketID).emit('hideSpinner',{message:"Invitation Declined"});
 				usersInMatch.delete(opponent);
+				usersInMatch.delete(challengerSocketID);
 			}
 			console.log(msg);
 		});
 
-		socket.on('cancleChallenge', function(msg){
+		socket.on('cancelChallenge', function(msg){
+			console.log('cancelChallege');
+			console.log(usersInMatch.get(msg.mySocketID));
 			mySocketID = msg.mySocketID;
 			challengerSocketID  = usersInMatch.get(mySocketID).challengerSocketID;
 			usersInMatch.delete(mySocketID);
 			usersInMatch.delete(challengerSocketID);
+
+			sockets.get(mySocketID).leave(challengerSocketID);
+			sockets.get(challengerSocketID).leave(mySocketID);
 
 			challengerRecord = onlineUser.get(mySocketID)
 			challengerRecord.status = 'Online';
@@ -288,7 +298,7 @@ module.exports = function(passport, io){
 			opponentRecord = onlineUser.get(challengerSocketID)
 			opponentRecord.status = 'Online';
 			onlineUser.set(challengerSocketID, opponentRecord)
-			io.to(mySocketID).emit('challengeCancelled',{message:"Challenge Canceled"});
+			io.to(challengerSocketID).emit('challengeCancelled',{message:"Challenge Canceled"});
 			if(onlineUser.size != 0){
 				let userArray = []
 				onlineUser.forEach( user=>{userArray.push(user)});
@@ -333,21 +343,31 @@ module.exports = function(passport, io){
 					axios.get('https://api.judge0.com/submissions/'+token)
 					.then(function(response){
 						console.log("Response from judnge 0");
-						//console.log(response)
+						console.log(response)
 						compileData = {}
-						compileData.result = response.data.stdout.trim();
-						//console.log('Result =='+compileData.result.localeCompare(testCaseResult));
-						console.log(compileData.result);
-						console.log(testCaseResult);
-						console.log(compileData.result === testCaseResult);
-						if(compileData.result === testCaseResult){
-							compileData.status = "Accepted"
-							io.in(mySocketID).emit('opponentsResult', 'Accepted');
-
-						}else{
-							compileData.status = "Failed"
-							io.in(mySocketID).emit('opponentsResult', 'Failed');
-
+						if(response.data.status.id == 1){
+							if(response.data.stdout != null){
+								compileData.result = response.data.stdout.trim();
+							}
+							//console.log('Result =='+compileData.result.localeCompare(testCaseResult));
+							console.log(compileData.result);
+							console.log(testCaseResult);
+							console.log(compileData.result === testCaseResult);
+							if(compileData.result === testCaseResult){
+								compileData.status = "Accepted"
+								io.in(mySocketID).emit('opponentsResult', 'Accepted');
+	
+							}else{
+								compileData.status = "Failed"
+								io.in(mySocketID).emit('opponentsResult', 'Failed');
+	
+							}
+							compileData.statusid = '1';
+						}else {
+							compileData.status = "Compilation failed";
+							compileData.statusid = '11';
+							compileData.stderr = response.data.stderr;
+							compileData.errDescription =response.data.status.description;
 						}
 						res.json({
 						compileData: compileData
