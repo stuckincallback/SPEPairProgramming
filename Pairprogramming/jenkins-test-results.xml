@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Mocha Tests" time="1.812" tests="8" failures="1">
+  <testsuite name="Root Suite" timestamp="2019-04-19T19:04:17" tests="0" failures="1" time="0">
+    <testcase name="Uncaught error outside test suite" time="0" classname="Uncaught error outside test suite">
+      <failure message="listen EADDRINUSE :::3001" type="Error"><![CDATA[Error: listen EADDRINUSE :::3001
+    at Object._errnoException (util.js:1022:11)
+    at _exceptionWithHostPort (util.js:1044:20)
+    at Server.setupListenHandle [as _listen2] (net.js:1367:14)
+    at listenInCluster (net.js:1408:12)
+    at Server.listen (net.js:1492:7)
+    at Function.listen (node_modules/express/lib/application.js:618:24)
+    at Object.<anonymous> (app.js:19:18)
+    at require (internal/module.js:11:18)
+    at Object.<anonymous> (test/getProfile.js:2:11)
+    at require (internal/module.js:11:18)
+    at Array.forEach (<anonymous>)
+    at startup (bootstrap_node.js:188:16)
+    at bootstrap_node.js:609:3]]></failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="Login" timestamp="2019-04-19T19:04:17" tests="4" file="/home/govinda/MyProjects/PairProgramming/Pairprogramming/test/getProfile.js" failures="0" time="0.625">
+    <testcase name="Login login" time="0.449" classname="login">
+    </testcase>
+    <testcase name="Login login check" time="0.05" classname="login check">
+    </testcase>
+    <testcase name="Login fake login check" time="0.088" classname="fake login check">
+    </testcase>
+    <testcase name="Login logout check" time="0.038" classname="logout check">
+    </testcase>
+  </testsuite>
+  <testsuite name="Page checking" timestamp="2019-04-19T19:04:18" tests="3" file="/home/govinda/MyProjects/PairProgramming/Pairprogramming/test/getProfile.js" failures="0" time="0.063">
+    <testcase name="Page checking check if page loading or not" time="0.011" classname="check if page loading or not">
+    </testcase>
+    <testcase name="Page checking home page checking without authentication" time="0.003" classname="home page checking without authentication">
+    </testcase>
+    <testcase name="Page checking home page checking with authentication" time="0.049" classname="home page checking with authentication">
+    </testcase>
+  </testsuite>
+  <testsuite name="problem route testing" timestamp="2019-04-19T19:04:18" tests="1" file="/home/govinda/MyProjects/PairProgramming/Pairprogramming/test/getProfile.js" failures="0" time="1.124">
+    <testcase name="problem route testing check if page loading or not" time="1.124" classname="check if page loading or not">
+    </testcase>
+  </testsuite>
+</testsuites>
