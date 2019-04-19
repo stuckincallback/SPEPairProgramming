@@ -1,6 +1,8 @@
 <%- include('layout'); -%>
 <body>
         <div class="row"> 
+             <button id = "cancelMatch" class="col-md-2" type="button" class="btn btn-primary" onclick="cancelChallenge()">Cancle</button>
+
              <div id="clockdiv" class="col-md-2 pull-right">
                     Minutes: <span class="minutes">Loading...</span><br>
                     Seconds: <span class="seconds"></span>
@@ -29,16 +31,20 @@
         <input type="hidden" id="myField" name="text" value="{{this.text}}" />
     
         </div>   
-        <div id="result">
-            <div class = "whitespace" id="status"></div>
-            <div>Sample Input</div> 
-            <div class = "whitespace" id="sampleinput"></div>
-            <div>Sample Output</div>
-            <div class = "whitespace" id="sampleoutput"></div>
-            <div>Your Output</div>
-            <div class = "whitespace" id="youroutput"></div>
-            <div>Your Output</div>
-            <div class = "whitespace" id="opponentsResult"></div>
+        <div id="result-wrapper">
+            <div id="result"><div class="loader">
+                <div class = "whitespace" id="status"></div>
+                </div>
+                <div>Sample Input</div> 
+                <div class = "whitespace" id="sampleinput"></div>
+                <div>Sample Output</div>
+                <div class = "whitespace" id="sampleoutput"></div>
+                <div>Your Sample Output</div>
+                <div class = "whitespace" id="youroutput"></div>
+                <div>Oppentents Result Output</div>
+                <div class = "whitespace" id="opponentsResult"></div>
+            </div>
+            <div id="stacktrace" class = "whitespace"></div>
         </div>
         <div class="modal"><!-- Place at bottom of page --></div>
 
@@ -72,6 +78,10 @@
             //$(".loader").hide()
             $("#clockdiv").hide();
             $("#opponentsResult").hide();
+            $("#result").hide();
+            $("#stacktrace").hide();
+            $("#cancelMatch").hide();
+            $('.loader').hide();
             var data = {
                 name: "",
                 text:"",
@@ -128,6 +138,7 @@
                                                         '<img class="chat-avatar" src="https://bootdey.com/img/Content/avatar/avatar1.png" alt="">'+
                                                         '<div class="chat-user-name">'+
                                                             '<span>'+element.userName+'</span>'+
+                                                            '<span class = pull-right>'+element.status+'</span>'+
                                                             '<Button class = "btn btn-primary btn-sm pull-right" onclick="connectToUser(this)" data-myid="'+element.socketid+'">Connect</Button>'+
                                                         '</div>'+
                                                     '</div>'+
@@ -144,7 +155,54 @@
                 });
 
                 socket.on('challengeAccepted', function(response)  {
-                
+                    $('#clockdiv').attr('data-inMatch', 'true');
+                });
+
+                socket.on('refreshUsersView', function(response)  {
+                    if($("#clockdiv").attr("data-inMatch") == 'true'){
+
+                    }else{
+                        $( "#question" ).empty();
+                        response.userArray.forEach(element => {
+                            //if(element.userName != userName){
+                            // $('#question').append($("#batchInsert").html());
+                                //$('#user-name').text(element.userName)
+                                var $newdiv1 = $('<div class="chat-users">'+
+                                                        '<div class="users-list">'+
+                                                            '<div class="chat-user">'+
+                                                            '<img class="chat-avatar" src="https://bootdey.com/img/Content/avatar/avatar1.png" alt="">'+
+                                                            '<div class="chat-user-name">'+
+                                                                '<span>'+element.userName+'</span>'+
+                                                                '<span id = "userStatus"class = pull-right>'+element.status+'</span>'+
+                                                                '<Button id= "connectBtn" class = "btn btn-primary btn-sm pull-right" onclick="connectToUser(this)" data-myid="'+element.socketid+'">Connect</Button>'+
+                                                            '</div>'+
+                                                        '</div>'+
+                                                    '<div>' );
+                            
+                            $('#question').append($newdiv1);
+                           
+                        });
+                        console.log($(" #question #userStatus"));
+                        $(" #question #userStatus").each(function(){
+                            if($(this).text() == 'InaMatch'){
+                                //console.log($(this));
+                                $(this).siblings("#connectBtn").attr("disabled", true)
+                            }
+                        });
+                    }
+                });
+
+                socket.on('challengeCancelled', function(response){
+                        $("#clockdiv").hide();
+                        $("#cancelMatch").hide();
+                        var filterVal = 'blur(0px)';
+                        $('#editor2')
+                        .css('filter',filterVal)
+                        .css('webkitFilter',filterVal)
+                        .css('mozFilter',filterVal)
+                        .css('oFilter',filterVal)
+                        .css('msFilter',filterVal);
+                        $('#clockdiv').attr('data-inMatch', 'false');
                 });
 
                 socket.on('hideSpinner', function(response)  {
@@ -153,7 +211,8 @@
 
                 socket.on('loadChallenge', function(response){
                     $('#clockdiv').show();
-                    $('#clockdiv').attr('data-inMatch', 'true');
+                    $("#result").show();
+                    $("#cancelMatch").show();
                     var filterVal = 'blur(10px)';
                     $('#editor2')
                     .css('filter',filterVal)
@@ -217,8 +276,24 @@
         function challengeAccepted(){
                         socket.emit('challengeAccepted',{opponentSocketID:socket.id});
         }
+
+        function cancelChallenge(){
+                        $("#clockdiv").hide();
+                        $("#cancelMatch").hide();
+                        var filterVal = 'blur(0px)';
+                        $('#editor2')
+                        .css('filter',filterVal)
+                        .css('webkitFilter',filterVal)
+                        .css('mozFilter',filterVal)
+                        .css('oFilter',filterVal)
+                        .css('msFilter',filterVal);
+                        $('#clockdiv').attr('data-inMatch', 'false');
+                        socket.emit('cancleChallenge',{mySocketID:socket.id});
+        }
+
        function compile(){
             $('#status').text("Compiling...");
+            $('.loader').show();
             let text = editor.getValue();
             let sampleInput = $('#sampleinput').text();
             let sampleOutput  = $('#sampleoutput').text();
@@ -239,6 +314,7 @@
             //console.log(document.getElementById('myField').value);
         }
         function getCompileData(data)  {
+            $('.loader').hide();
             console.log(data)
             $('#status').text(data.compileData.status);
             $('#youroutput').text(data.compileData.result);
@@ -246,6 +322,7 @@
 
         function submit(){
             $('#status').text("Submitting...");
+            $('.loader').show();
             let text = editor.getValue();
             postData = {
                 code: text,

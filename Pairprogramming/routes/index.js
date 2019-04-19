@@ -2,14 +2,43 @@ var express = require('express');
 const rp = require('request-promise');
 const $ = require('cheerio');
 const axios = require('axios');
-var questionsSchema = require('../models/questions');
+//var questionsSchema = require('../models/questions');
 var mongooseQuestions = require('mongoose');
+var question;
+const MongoClient = require('mongodb').MongoClient;
+const uri = "mongodb+srv://root:root@cluster0-4zdqp.mongodb.net/QuestionsDB?retryWrites=true";
+/*const client = new MongoClient(uri, { useNewUrlParser: true });
+client.connect(err => {
+	question = client.db("test").collection("devices");
+  	// perform actions on the collection object
+  	client.close();
+});*/
 
-mongooseQuestions.connect('mongodb://localhost/questions',{useNewUrlParser: true});
-
-
-var question = mongooseQuestions.model('questions', questionsSchema);
-
+//mongooseQuestions.connect('mongodb://localhost/questions',{useNewUrlParser: true});
+/*mongooseQuestions.connect('mongodb+srv://root:root@cluster0-4zdqp.mongodb.net/QuestionsDB?retryWrites=true',{useNewUrlParser: true},function(err){
+	if(!err){
+		console.log("no error!")
+	}
+});
+var Schema = mongooseQuestions.Schema;
+question = mongooseQuestions.model('questions', new Schema(
+	{
+		url : String,
+		finalTestCase: String,
+		finalSolution : String
+	},{ collection : 'question' })
+);*/ 
+/*question.find(function (err,  docs) {
+	if (err) return console.error(err);
+	console.log(docs);
+  })*/
+//question = mongooseQuestions.model('question', new mongooseQuestions.Schema(,{ collection : 'questions' }));
+//question = mongooseQuestions.model('questions');
+/*question.find(function (err, questiongot) {
+	if (err) console.log(err);
+	console.log('---Second');
+	console.log(questiongot);
+});*/
 var router = express.Router();
 var onlineUser= new Map();
 var usersInMatch = new Map();
@@ -72,7 +101,10 @@ module.exports = function(passport, io){
 	
 		}else{
 			usersInMatch.set(opponent, {challengerSocketID:challenger,
-                						opponentSocketID:opponent});
+										opponentSocketID:opponent});
+
+			usersInMatch.set(challenger, {challengerSocketID:opponent,
+											opponentSocketID:challenger});							
 		}
 		io.to(opponent).emit('challengeReceived',{name:challengerName})
 	});
@@ -113,18 +145,32 @@ module.exports = function(passport, io){
 		}else if(type == 'submit'){
 			let url = req.body.url;
 			console.log(url);
+			MongoClient.connect(uri, function(err, db) {
+				if (err) throw err;
+				var dbo = db.db("QuestionsDB");
+				dbo.collection("question").findOne({ 'url': url }, function(err, questiongot) {
+					if (err) console.log(err);
+					//console.log(questiongot);
+					testCase = questiongot.finalTestCase.replace('/\\n/','/\n/');;
+					testCase = '10\n570 751 980 995 529 940 212 848 718 515'
+					testCaseResult = questiongot.finalSolution.trim();
+					//console.log(testCase);
+					makeRequest(res, source, testCase, testCaseResult, mySocketID);
+				  db.close();
+				});
+			  });
 			/*question.find(function (err,  docs) {
 				if (err) return console.error(err);
 				console.log(docs);
 			  })*/
-			  question.findOne({ 'url': url }, 'finalTestCase finalSolution', function (err, questiongot) {
+			  /*question.findOne({ 'url': url }, 'finalTestCase finalSolution', function (err, questiongot) {
 				if (err) console.log(err);
 				console.log(questiongot);
 				testCase = questiongot.finalTestCase;
 				//testCase = '10\n570 751 980 995 529 940 212 848 718 515'
 				testCaseResult = questiongot.finalSolution.trim();
-				makeRequest(res, source, testCase, testCaseResult, mySocketID);
-			  });
+				//makeRequest(res, source, testCase, testCaseResult, mySocketID);
+			  });*/
 			//testCase = req.body.sampleInput;
 			//testCaseResult = req.body.sampleOutput.trim();
 		}
@@ -143,7 +189,7 @@ module.exports = function(passport, io){
 		response={}
 		console.log('socket id is '+socket.id);
 		socket.on('codeInEditor', function(msg){
-		  console.log(msg);
+		  //console.log(msg);
 		  response.text = msg.text;
 		  response.name = msg.name;
 			//io.sockets.emit('codeInOpponentsEditor', response);
@@ -154,6 +200,7 @@ module.exports = function(passport, io){
 			if(onlineUser.has(msg.userName)){
 	
 			}else{
+				msg.status = 'Online';
 				onlineUser.set(msg.socketid, msg);
 			}
 			if(onlineUser.size != 0){
@@ -179,6 +226,25 @@ module.exports = function(passport, io){
 				//console.log(sockets[challengerSocketID]);
 				sockets.get(challengerSocketID).join(opponentSocketID);// Included first
 				sockets.get(opponentSocketID).join(challengerSocketID);// Included next day
+				
+				challengerRecord = onlineUser.get(challengerSocketID)
+				challengerRecord.status = 'InaMatch';
+				onlineUser.set(challengerSocketID, challengerRecord)
+
+				opponentRecord = onlineUser.get(opponentSocketID)
+				opponentRecord.status = 'InaMatch';
+				onlineUser.set(opponentSocketID, opponentRecord)
+
+				io.in(opponentSocketID).emit('challengeAccepted', 'set data-inMatch Atrribute');
+				io.in(challengerSocketID).emit('challengeAccepted', 'set data-inMatch Atrribute');
+				
+
+				if(onlineUser.size != 0){
+					let userArray = []
+					onlineUser.forEach( user=>{userArray.push(user)});
+					io.sockets.emit('refreshUsersView',{userArray});
+				}
+
 				io.in(opponentSocketID).emit('loadChallenge', {questionUrl:"https://www.hackerearth.com/practice/algorithms/sorting/insertion-sort/practice-problems/algorithm/the-rise-of-the-weird-things-1/"});
 				var starttime = new Date();
 				endtime = addMinutes(starttime, 1);
@@ -198,6 +264,7 @@ module.exports = function(passport, io){
 			}
 			console.log(msg);
 		});
+
 		socket.on('challengeRejected', function(msg){
 			var opponent = msg.opponentSocketID;
 			if(usersInMatch.has(opponent)){
@@ -207,7 +274,28 @@ module.exports = function(passport, io){
 			}
 			console.log(msg);
 		});
+
+		socket.on('cancleChallenge', function(msg){
+			mySocketID = msg.mySocketID;
+			challengerSocketID  = usersInMatch.get(mySocketID).challengerSocketID;
+			usersInMatch.delete(mySocketID);
+			usersInMatch.delete(challengerSocketID);
+
+			challengerRecord = onlineUser.get(mySocketID)
+			challengerRecord.status = 'Online';
+			onlineUser.set(mySocketID, challengerRecord)
+
+			opponentRecord = onlineUser.get(challengerSocketID)
+			opponentRecord.status = 'Online';
+			onlineUser.set(challengerSocketID, opponentRecord)
+			io.to(mySocketID).emit('challengeCancelled',{message:"Challenge Canceled"});
+			if(onlineUser.size != 0){
+				let userArray = []
+				onlineUser.forEach( user=>{userArray.push(user)});
+				io.sockets.emit('refreshUsersView',{userArray});
+			}
 		});
+	});
 		
 		function addMinutes(date, minutes) {
 			return new Date(date.getTime() + minutes*60000);
@@ -245,12 +333,12 @@ module.exports = function(passport, io){
 					axios.get('https://api.judge0.com/submissions/'+token)
 					.then(function(response){
 						console.log("Response from judnge 0");
-						console.log(response)
+						//console.log(response)
 						compileData = {}
 						compileData.result = response.data.stdout.trim();
 						//console.log('Result =='+compileData.result.localeCompare(testCaseResult));
-						console.log(typeof(compileData.result));
-						console.log(typeof(testCaseResult));
+						console.log(compileData.result);
+						console.log(testCaseResult);
 						console.log(compileData.result === testCaseResult);
 						if(compileData.result === testCaseResult){
 							compileData.status = "Accepted"
